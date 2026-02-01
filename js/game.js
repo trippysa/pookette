@@ -11,8 +11,8 @@
     // Physics (slowed down)
     gravity: 0.5,
     jumpForce: -11,
-    baseSpeed: 3,
-    maxSpeed: 7,
+    baseSpeed: 4,
+    maxSpeed: 8,
     speedIncrement: 0.0005,
 
     // Theo
@@ -326,7 +326,7 @@
           y: CONFIG.groundY - 55,
           width: tunnelWidth,
           height: 65,
-          stars: generateStars(tunnelWidth)
+          stars: generateStars(tunnelWidth, 65)
         });
         // Spawn tuna inside tunnel (easy to grab while passing through)
         collectibles.push({
@@ -376,15 +376,21 @@
     nextSpawnX -= speed;
   }
 
-  function generateStars(width) {
+  function generateStars(width, height) {
     const stars = [];
-    const numStars = Math.floor(width / 20);
-    for (let i = 0; i < numStars; i++) {
-      stars.push({
-        x: 10 + Math.random() * (width - 20),
-        y: 10 + Math.random() * 45,
-        size: 1 + Math.random() * 2
-      });
+    const cols = 6;
+    const rows = 3;
+    const cellWidth = (width - 30) / cols;
+    const cellHeight = (height - 20) / rows;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        stars.push({
+          x: 15 + col * cellWidth + cellWidth / 2,
+          y: 10 + row * cellHeight + cellHeight / 2,
+          size: 2 + Math.random() * 1.5
+        });
+      }
     }
     return stars;
   }
