@@ -39,7 +39,7 @@
       orangeDark: '#CC8400',
       bag: '#B8E0FF',
       bagOutline: '#5599CC',
-      tunnel: '#444455',
+      tunnel: '#5A5A6A',
       tunnelStar: '#FFFFFF',
       tuna: '#4169E1',
       tunaShine: '#6B8DD6',
@@ -378,17 +378,19 @@
 
   function generateStars(width, height) {
     const stars = [];
-    const cols = 6;
-    const rows = 3;
-    const cellWidth = (width - 30) / cols;
-    const cellHeight = (height - 20) / rows;
+    const cols = 12;
+    const rows = 5;
+    const cellWidth = width / cols;
+    const cellHeight = height / rows;
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
+        // Offset every other row for a more natural star pattern
+        const offsetX = (row % 2 === 0) ? 0 : cellWidth / 2;
         stars.push({
-          x: 15 + col * cellWidth + cellWidth / 2,
-          y: 10 + row * cellHeight + cellHeight / 2,
-          size: 2 + Math.random() * 1.5
+          x: offsetX + col * cellWidth + cellWidth / 2,
+          y: row * cellHeight + cellHeight / 2,
+          size: 4
         });
       }
     }
@@ -784,32 +786,44 @@
   function drawTunnel(tunnel) {
     ctx.save();
 
-    // Outer tunnel - grey with rounded ends
+    // Outer tunnel - grey with rounded ends (like the real fabric tunnel)
     ctx.fillStyle = CONFIG.colors.tunnel;
     ctx.beginPath();
-    ctx.roundRect(tunnel.x, tunnel.y, tunnel.width, tunnel.height, 15);
+    ctx.roundRect(tunnel.x, tunnel.y, tunnel.width, tunnel.height, 20);
     ctx.fill();
 
-    // Draw stars
+    // Draw stars (dense pattern like the real tunnel)
     ctx.fillStyle = CONFIG.colors.tunnelStar;
     tunnel.stars.forEach(star => {
-      // Draw a simple star shape
+      // Draw a 5-pointed star
       const sx = tunnel.x + star.x;
       const sy = tunnel.y + star.y;
       const size = star.size;
+      const spikes = 5;
+      const outerRadius = size;
+      const innerRadius = size * 0.4;
 
       ctx.beginPath();
-      ctx.moveTo(sx, sy - size);
-      ctx.lineTo(sx + size * 0.3, sy - size * 0.3);
-      ctx.lineTo(sx + size, sy);
-      ctx.lineTo(sx + size * 0.3, sy + size * 0.3);
-      ctx.lineTo(sx, sy + size);
-      ctx.lineTo(sx - size * 0.3, sy + size * 0.3);
-      ctx.lineTo(sx - size, sy);
-      ctx.lineTo(sx - size * 0.3, sy - size * 0.3);
+      for (let i = 0; i < spikes * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i * Math.PI / spikes) - Math.PI / 2;
+        const x = sx + Math.cos(angle) * radius;
+        const y = sy + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
       ctx.closePath();
       ctx.fill();
     });
+
+    // Peek-a-boo holes on top (like the real tunnel)
+    ctx.fillStyle = '#3A3A4A';
+    ctx.beginPath();
+    ctx.ellipse(tunnel.x + tunnel.width * 0.3, tunnel.y + 8, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(tunnel.x + tunnel.width * 0.7, tunnel.y + 8, 12, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
 
     // Inner openings (darker)
     ctx.fillStyle = '#222233';
@@ -819,12 +833,6 @@
     ctx.beginPath();
     ctx.ellipse(tunnel.x + tunnel.width - 8, tunnel.y + tunnel.height/2, 10, tunnel.height/2 - 8, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // Label
-    ctx.fillStyle = '#AAAACC';
-    ctx.font = 'bold 11px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('CAT TUNNEL', tunnel.x + tunnel.width/2, tunnel.y + tunnel.height/2 + 4);
 
     ctx.restore();
   }
