@@ -2,9 +2,142 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Theo - Pookette</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Game section styles */
+    .play-game-btn {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, var(--pink) 0%, #f9a0b0 100%);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      font-family: inherit;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(255, 182, 193, 0.4);
+    }
+
+    .play-game-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(255, 182, 193, 0.6);
+    }
+
+    .game-section {
+      display: none;
+      margin-top: 2rem;
+      padding-top: 2rem;
+      border-top: 2px dashed var(--pink-light);
+    }
+
+    .game-section.active {
+      display: block;
+    }
+
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .game-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+      margin-bottom: 1rem;
+      padding: 0.5rem 1rem;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .score-display {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    .score-display span {
+      color: var(--pink);
+    }
+
+    .tuna-display {
+      font-weight: 700;
+      font-size: 1rem;
+      color: #4169E1;
+    }
+
+    .game-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .game-btn {
+      background: var(--lavender);
+      border: none;
+      padding: 0.4rem 0.8rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .game-btn:hover {
+      background: var(--pink-light);
+    }
+
+    .game-btn.active {
+      background: var(--pink);
+      color: white;
+    }
+
+    #gameCanvas {
+      border-radius: 20px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      max-width: 100%;
+      touch-action: none;
+    }
+
+    .game-instructions {
+      margin-top: 1rem;
+      text-align: center;
+      color: var(--text-light);
+      font-size: 0.9rem;
+    }
+
+    .game-instructions kbd {
+      background: var(--lavender);
+      padding: 0.2rem 0.5rem;
+      border-radius: 5px;
+      font-family: inherit;
+    }
+
+    .close-game-btn {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background: var(--text-light);
+      color: white;
+      border: none;
+      border-radius: 15px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .close-game-btn:hover {
+      background: var(--text-dark);
+    }
+  </style>
 </head>
 <body>
   <nav>
@@ -13,7 +146,6 @@
       <li><a href="glossary.html">Glossary</a></li>
       <li><a href="gallery.html">Gallery</a></li>
       <li><a href="cat.html" class="active">Theo</a></li>
-      <li><a href="game.html">Game</a></li>
     </ul>
   </nav>
 
@@ -22,11 +154,62 @@
       <img src="Theo.jpg" alt="Theo the Cat">
       <h2 class="cat-name">Theo</h2>
       <p class="cat-description">A Pooko of enormous size and cuteness</p>
+      <button class="play-game-btn" onclick="toggleGame()">Play Theo Runner</button>
+    </div>
+
+    <div id="gameSection" class="game-section">
+      <div class="game-container">
+        <div class="game-header">
+          <div class="score-display">
+            Score: <span id="score">0</span> | Best: <span id="bestScore">0</span>
+          </div>
+          <div class="tuna-display">
+            Tuna: <span id="tunaCount">0</span>
+          </div>
+          <div class="game-controls">
+            <button id="soundBtn" class="game-btn active" title="Toggle Sound">Sound</button>
+            <button id="restartBtn" class="game-btn" title="Restart (R)">Restart</button>
+          </div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+        <div class="game-instructions">
+          <p><kbd>Space</kbd> or <kbd>Tap</kbd> to jump | <kbd>R</kbd> to restart</p>
+          <p>Jump over oranges and bags, collect tuna cans, pass through tunnels!</p>
+        </div>
+
+        <button class="close-game-btn" onclick="toggleGame()">Close Game</button>
+      </div>
     </div>
   </main>
 
   <footer>
     <p>Made with love for Pookette</p>
   </footer>
+
+  <script>
+    let gameInitialized = false;
+
+    function toggleGame() {
+      const section = document.getElementById('gameSection');
+      section.classList.toggle('active');
+
+      if (section.classList.contains('active') && !gameInitialized) {
+        // Load game script
+        const script = document.createElement('script');
+        script.src = 'js/game.js';
+        script.onload = function() {
+          gameInitialized = true;
+        };
+        document.body.appendChild(script);
+      }
+
+      // Scroll to game if opening
+      if (section.classList.contains('active')) {
+        section.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  </script>
 </body>
 </html>

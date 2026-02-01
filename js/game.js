@@ -8,12 +8,12 @@
 
   // ============== CONFIG ==============
   const CONFIG = {
-    // Physics
-    gravity: 0.6,
-    jumpForce: -12,
-    baseSpeed: 5,
-    maxSpeed: 12,
-    speedIncrement: 0.001,
+    // Physics (slowed down)
+    gravity: 0.5,
+    jumpForce: -11,
+    baseSpeed: 3,
+    maxSpeed: 7,
+    speedIncrement: 0.0005,
 
     // Theo
     theoWidth: 50,
@@ -21,11 +21,11 @@
     theoX: 80,
     groundY: 320,
 
-    // Spawning
-    minObstacleGap: 200,
-    maxObstacleGap: 400,
+    // Spawning (more spread out)
+    minObstacleGap: 300,
+    maxObstacleGap: 500,
     tunnelChance: 0.15,
-    tunaChance: 0.3,
+    tunaChance: 0.5,
 
     // Colors
     colors: {
@@ -36,13 +36,14 @@
       theo: '#FFFFFF',
       theoOutline: '#333333',
       orange: '#FFA500',
-      orangeDark: '#E59400',
-      bag: '#DDDDDD',
-      bagOutline: '#999999',
-      tunnel: '#8B4513',
-      tunnelInner: '#5D2E0C',
-      tuna: '#C0C0C0',
-      tunaLabel: '#4169E1',
+      orangeDark: '#CC8400',
+      bag: '#B8E0FF',
+      bagOutline: '#5599CC',
+      tunnel: '#444455',
+      tunnelStar: '#FFFFFF',
+      tuna: '#4169E1',
+      tunaShine: '#6B8DD6',
+      tunaLabel: '#FFFFFF',
       cloud: 'rgba(255, 255, 255, 0.8)'
     }
   };
@@ -56,6 +57,8 @@
   let reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let shakeTime = 0;
   let speed = CONFIG.baseSpeed;
+  let sleepZTime = 0;
+  let tunaCollected = 0;
 
   // Theo state
   let theo = {
@@ -80,6 +83,8 @@
   // ============== INITIALIZATION ==============
   function init() {
     canvas = document.getElementById('gameCanvas');
+    if (!canvas) return; // Exit if canvas not found
+
     ctx = canvas.getContext('2d');
 
     // Responsive canvas
@@ -93,11 +98,14 @@
     canvas.addEventListener('mousedown', handleClick);
 
     // UI buttons
-    document.getElementById('soundBtn').addEventListener('click', toggleSound);
-    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    const soundBtn = document.getElementById('soundBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    if (soundBtn) soundBtn.addEventListener('click', toggleSound);
+    if (restartBtn) restartBtn.addEventListener('click', restartGame);
 
     // Update best score display
-    document.getElementById('bestScore').textContent = bestScore;
+    const bestScoreEl = document.getElementById('bestScore');
+    if (bestScoreEl) bestScoreEl.textContent = bestScore;
 
     // Initialize clouds
     for (let i = 0; i < 5; i++) {
@@ -165,12 +173,13 @@
   function toggleSound() {
     soundEnabled = !soundEnabled;
     const btn = document.getElementById('soundBtn');
-    btn.classList.toggle('active', soundEnabled);
+    if (btn) btn.classList.toggle('active', soundEnabled);
   }
 
   function restartGame() {
     gameState = 'playing';
     score = 0;
+    tunaCollected = 0;
     speed = CONFIG.baseSpeed;
     theo.y = CONFIG.groundY;
     theo.vy = 0;
@@ -180,7 +189,11 @@
     tunnels = [];
     nextSpawnX = 500;
     shakeTime = 0;
-    document.getElementById('score').textContent = '0';
+    sleepZTime = 0;
+    const scoreEl = document.getElementById('score');
+    if (scoreEl) scoreEl.textContent = '0';
+    const tunaEl = document.getElementById('tunaCount');
+    if (tunaEl) tunaEl.textContent = '0';
   }
 
   // ============== AUDIO ==============
@@ -232,6 +245,11 @@
 
   // ============== GAME LOGIC ==============
   function update() {
+    if (gameState === 'gameover') {
+      sleepZTime++;
+      return;
+    }
+
     if (gameState !== 'playing') return;
 
     // Increase difficulty
@@ -277,7 +295,8 @@
 
     // Update score
     score++;
-    document.getElementById('score').textContent = Math.floor(score / 10);
+    const scoreEl = document.getElementById('score');
+    if (scoreEl) scoreEl.textContent = Math.floor(score / 10);
 
     // Screen shake decay
     if (shakeTime > 0) {
@@ -300,19 +319,30 @@
       const rand = Math.random();
 
       if (rand < CONFIG.tunnelChance) {
-        // Spawn tunnel (safe zone)
+        // Spawn tunnel (safe zone) - now longer!
+        const tunnelWidth = 180;
         tunnels.push({
           x: canvas.width,
-          y: CONFIG.groundY - 50,
-          width: 100,
-          height: 60
+          y: CONFIG.groundY - 55,
+          width: tunnelWidth,
+          height: 65,
+          stars: generateStars(tunnelWidth)
         });
-        // Spawn tuna inside tunnel
+        // Spawn tuna inside tunnel (easy to grab while passing through)
         collectibles.push({
-          x: canvas.width + 35,
+          x: canvas.width + 70,
           y: CONFIG.groundY - 25,
-          width: 30,
-          height: 20,
+          width: 40,
+          height: 25,
+          collected: false
+        });
+      } else if (rand < CONFIG.tunnelChance + 0.2) {
+        // Spawn just a tuna by itself (easy pickup!)
+        collectibles.push({
+          x: canvas.width,
+          y: CONFIG.groundY - 50,
+          width: 40,
+          height: 25,
           collected: false
         });
       } else {
@@ -320,19 +350,19 @@
         const isOrange = Math.random() > 0.5;
         obstacles.push({
           x: canvas.width,
-          y: CONFIG.groundY - (isOrange ? 25 : 35),
-          width: isOrange ? 30 : 35,
-          height: isOrange ? 30 : 40,
+          y: CONFIG.groundY - (isOrange ? 30 : 45),
+          width: isOrange ? 35 : 45,
+          height: isOrange ? 35 : 50,
           type: isOrange ? 'orange' : 'bag'
         });
 
-        // Maybe spawn tuna above obstacle
+        // Maybe spawn tuna above obstacle (lower, easier to reach with a jump)
         if (Math.random() < CONFIG.tunaChance) {
           collectibles.push({
-            x: canvas.width,
-            y: CONFIG.groundY - 80,
-            width: 30,
-            height: 20,
+            x: canvas.width + 10,
+            y: CONFIG.groundY - 65,
+            width: 40,
+            height: 25,
             collected: false
           });
         }
@@ -344,6 +374,19 @@
     }
 
     nextSpawnX -= speed;
+  }
+
+  function generateStars(width) {
+    const stars = [];
+    const numStars = Math.floor(width / 20);
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: 10 + Math.random() * (width - 20),
+        y: 10 + Math.random() * 45,
+        size: 1 + Math.random() * 2
+      });
+    }
+    return stars;
   }
 
   function checkCollisions() {
@@ -378,6 +421,9 @@
       if (!coll.collected && boxCollision(theoBox, coll)) {
         coll.collected = true;
         score += 100;
+        tunaCollected++;
+        const tunaEl = document.getElementById('tunaCount');
+        if (tunaEl) tunaEl.textContent = tunaCollected;
         playSound('collect');
       }
     }
@@ -393,6 +439,7 @@
   function gameOver() {
     gameState = 'gameover';
     playSound('hit');
+    sleepZTime = 0;
 
     if (!reducedMotion) {
       shakeTime = 15;
@@ -402,7 +449,8 @@
     if (finalScore > bestScore) {
       bestScore = finalScore;
       localStorage.setItem('theoRunnerBest', bestScore);
-      document.getElementById('bestScore').textContent = bestScore;
+      const bestScoreEl = document.getElementById('bestScore');
+      if (bestScoreEl) bestScoreEl.textContent = bestScore;
     }
   }
 
@@ -459,7 +507,11 @@
     });
 
     // Draw Theo
-    drawTheo();
+    if (gameState === 'gameover') {
+      drawSleepingTheo();
+    } else {
+      drawTheo();
+    }
 
     ctx.restore();
 
@@ -467,7 +519,7 @@
     if (gameState === 'start') {
       drawOverlay('THEO RUNNER', 'Press SPACE or Tap to Start!', '#FFB6C1');
     } else if (gameState === 'gameover') {
-      drawOverlay('GAME OVER', `Score: ${Math.floor(score/10)} | Press R or Tap to Restart`, '#FF6B6B');
+      drawGameOverOverlay();
     }
   }
 
@@ -570,13 +622,96 @@
     ctx.restore();
   }
 
+  function drawSleepingTheo() {
+    const x = theo.x;
+    const y = CONFIG.groundY; // Always on ground when sleeping
+
+    ctx.save();
+
+    // Body (white oval, lying down - flatter)
+    ctx.fillStyle = CONFIG.colors.theo;
+    ctx.strokeStyle = CONFIG.colors.theoOutline;
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.ellipse(x + 25, y - 12, 28, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Head (resting on paws)
+    ctx.beginPath();
+    ctx.ellipse(x + 50, y - 15, 14, 12, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Ears (more relaxed)
+    ctx.beginPath();
+    ctx.moveTo(x + 42, y - 24);
+    ctx.lineTo(x + 44, y - 34);
+    ctx.lineTo(x + 50, y - 25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x + 50, y - 25);
+    ctx.lineTo(x + 54, y - 34);
+    ctx.lineTo(x + 60, y - 22);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Closed eyes (curved lines)
+    ctx.strokeStyle = CONFIG.colors.theoOutline;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + 54, y - 16, 4, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    // Nose
+    ctx.fillStyle = '#FFB6C1';
+    ctx.beginPath();
+    ctx.ellipse(x + 62, y - 12, 2, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Paws tucked under head
+    ctx.fillStyle = CONFIG.colors.theo;
+    ctx.strokeStyle = CONFIG.colors.theoOutline;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x + 55, y - 5, 8, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Tail curled
+    ctx.strokeStyle = CONFIG.colors.theoOutline;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - 3, y - 12);
+    ctx.quadraticCurveTo(x - 20, y - 15, x - 15, y - 5);
+    ctx.stroke();
+
+    // Z's floating above head
+    const zOffset = Math.sin(sleepZTime / 15) * 3;
+    ctx.fillStyle = '#6666AA';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('z', x + 65, y - 35 + zOffset);
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText('Z', x + 75, y - 50 + zOffset * 0.8);
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('z', x + 85, y - 60 + zOffset * 0.6);
+
+    ctx.restore();
+  }
+
   function drawOrange(obs) {
     ctx.save();
 
     // Orange body
     ctx.fillStyle = CONFIG.colors.orange;
     ctx.strokeStyle = CONFIG.colors.orangeDark;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
 
     ctx.beginPath();
     ctx.arc(obs.x + obs.width/2, obs.y + obs.height/2, obs.width/2, 0, Math.PI * 2);
@@ -586,8 +721,14 @@
     // Leaf
     ctx.fillStyle = '#228B22';
     ctx.beginPath();
-    ctx.ellipse(obs.x + obs.width/2, obs.y - 2, 5, 3, 0.5, 0, Math.PI * 2);
+    ctx.ellipse(obs.x + obs.width/2, obs.y - 2, 6, 4, 0.5, 0, Math.PI * 2);
     ctx.fill();
+
+    // Label
+    ctx.fillStyle = '#CC6600';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🍊', obs.x + obs.width/2, obs.y + obs.height/2 + 4);
 
     ctx.restore();
   }
@@ -595,27 +736,41 @@
   function drawBag(obs) {
     ctx.save();
 
-    // Bag body
+    // Bag body - more visible blue plastic bag
     ctx.fillStyle = CONFIG.colors.bag;
     ctx.strokeStyle = CONFIG.colors.bagOutline;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
 
     // Crinkled bag shape
     ctx.beginPath();
     ctx.moveTo(obs.x + 5, obs.y + obs.height);
     ctx.lineTo(obs.x, obs.y + obs.height * 0.3);
-    ctx.quadraticCurveTo(obs.x + obs.width/4, obs.y - 5, obs.x + obs.width/2, obs.y);
-    ctx.quadraticCurveTo(obs.x + obs.width * 0.75, obs.y - 5, obs.x + obs.width, obs.y + obs.height * 0.3);
+    ctx.quadraticCurveTo(obs.x + obs.width/4, obs.y - 8, obs.x + obs.width/2, obs.y);
+    ctx.quadraticCurveTo(obs.x + obs.width * 0.75, obs.y - 8, obs.x + obs.width, obs.y + obs.height * 0.3);
     ctx.lineTo(obs.x + obs.width - 5, obs.y + obs.height);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
+    // Bag crinkle details
+    ctx.strokeStyle = CONFIG.colors.bagOutline;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(obs.x + 10, obs.y + 15);
+    ctx.lineTo(obs.x + 15, obs.y + obs.height - 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(obs.x + obs.width - 10, obs.y + 15);
+    ctx.lineTo(obs.x + obs.width - 15, obs.y + obs.height - 10);
+    ctx.stroke();
+
     // Bag label
-    ctx.fillStyle = '#666';
-    ctx.font = '8px sans-serif';
+    ctx.fillStyle = CONFIG.colors.bagOutline;
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('BAG', obs.x + obs.width/2, obs.y + obs.height * 0.6);
+    ctx.fillText('PLASTIC', obs.x + obs.width/2, obs.y + obs.height * 0.5);
+    ctx.font = '9px sans-serif';
+    ctx.fillText('BAG', obs.x + obs.width/2, obs.y + obs.height * 0.7);
 
     ctx.restore();
   }
@@ -623,26 +778,47 @@
   function drawTunnel(tunnel) {
     ctx.save();
 
-    // Outer tunnel
+    // Outer tunnel - grey with rounded ends
     ctx.fillStyle = CONFIG.colors.tunnel;
     ctx.beginPath();
-    ctx.roundRect(tunnel.x, tunnel.y, tunnel.width, tunnel.height, 10);
+    ctx.roundRect(tunnel.x, tunnel.y, tunnel.width, tunnel.height, 15);
     ctx.fill();
 
-    // Inner opening
-    ctx.fillStyle = CONFIG.colors.tunnelInner;
+    // Draw stars
+    ctx.fillStyle = CONFIG.colors.tunnelStar;
+    tunnel.stars.forEach(star => {
+      // Draw a simple star shape
+      const sx = tunnel.x + star.x;
+      const sy = tunnel.y + star.y;
+      const size = star.size;
+
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - size);
+      ctx.lineTo(sx + size * 0.3, sy - size * 0.3);
+      ctx.lineTo(sx + size, sy);
+      ctx.lineTo(sx + size * 0.3, sy + size * 0.3);
+      ctx.lineTo(sx, sy + size);
+      ctx.lineTo(sx - size * 0.3, sy + size * 0.3);
+      ctx.lineTo(sx - size, sy);
+      ctx.lineTo(sx - size * 0.3, sy - size * 0.3);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    // Inner openings (darker)
+    ctx.fillStyle = '#222233';
     ctx.beginPath();
-    ctx.ellipse(tunnel.x + 5, tunnel.y + tunnel.height/2, 8, tunnel.height/2 - 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(tunnel.x + 8, tunnel.y + tunnel.height/2, 10, tunnel.height/2 - 8, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(tunnel.x + tunnel.width - 5, tunnel.y + tunnel.height/2, 8, tunnel.height/2 - 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(tunnel.x + tunnel.width - 8, tunnel.y + tunnel.height/2, 10, tunnel.height/2 - 8, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Label
-    ctx.fillStyle = '#DEB887';
-    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = '#AAAACC';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('TUNNEL', tunnel.x + tunnel.width/2, tunnel.y + tunnel.height/2 + 4);
+    ctx.fillText('CAT TUNNEL', tunnel.x + tunnel.width/2, tunnel.y + tunnel.height/2 + 4);
 
     ctx.restore();
   }
@@ -650,25 +826,29 @@
   function drawTuna(coll) {
     ctx.save();
 
-    // Can body
+    // Can body - brighter blue
     ctx.fillStyle = CONFIG.colors.tuna;
-    ctx.strokeStyle = '#888';
+    ctx.strokeStyle = '#2850A0';
     ctx.lineWidth = 2;
 
     ctx.beginPath();
-    ctx.roundRect(coll.x, coll.y, coll.width, coll.height, 3);
+    ctx.roundRect(coll.x, coll.y, coll.width, coll.height, 5);
     ctx.fill();
     ctx.stroke();
 
+    // Lighter stripe
+    ctx.fillStyle = CONFIG.colors.tunaShine;
+    ctx.fillRect(coll.x + 3, coll.y + 3, coll.width - 6, 6);
+
     // Label
     ctx.fillStyle = CONFIG.colors.tunaLabel;
-    ctx.font = 'bold 8px sans-serif';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('TUNA', coll.x + coll.width/2, coll.y + coll.height/2 + 3);
+    ctx.fillText('TUNA', coll.x + coll.width/2, coll.y + coll.height/2 + 5);
 
-    // Shine effect
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.fillRect(coll.x + 2, coll.y + 2, 8, 4);
+    // Fish icon
+    ctx.font = '10px sans-serif';
+    ctx.fillText('🐟', coll.x + coll.width/2, coll.y + 10);
 
     ctx.restore();
   }
@@ -696,6 +876,28 @@
     ctx.fillText(subtitle, canvas.width/2, canvas.height/2 + 30);
   }
 
+  function drawGameOverOverlay() {
+    // Semi-transparent background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Score box at top
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.roundRect(canvas.width/2 - 120, 30, 240, 80, 15);
+    ctx.fill();
+
+    // Score text
+    ctx.fillStyle = '#666';
+    ctx.font = '18px Quicksand, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Score: ' + Math.floor(score/10), canvas.width/2, 60);
+
+    ctx.fillStyle = '#FFB6C1';
+    ctx.font = 'bold 16px Quicksand, sans-serif';
+    ctx.fillText('Tap or press R to try again', canvas.width/2, 90);
+  }
+
   // ============== GAME LOOP ==============
   function gameLoop() {
     update();
@@ -704,6 +906,10 @@
   }
 
   // ============== START ==============
+  // Export init function for external use
+  window.initTheoRunner = init;
+
+  // Auto-init if canvas exists on page load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
